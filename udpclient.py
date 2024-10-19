@@ -14,6 +14,7 @@ def receive_messages(client_socket):
             message = client_socket.recv(1024)
             if message:
                 print(message.decode())
+                
             else:
                 break
         except:
@@ -22,6 +23,9 @@ def receive_messages(client_socket):
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect((HOST, PORT))
 
+# Display connection info
+print(f"Connected to server: {HOST}:{PORT}")
+      
 # Start a thread to receive messages
 thread = threading.Thread(target=receive_messages, args=(client_socket,))
 thread.start()
