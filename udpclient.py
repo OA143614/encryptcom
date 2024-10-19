@@ -11,21 +11,18 @@ PORT = 65432
 def receive_messages(client_socket):
     while True:
         try:
-            message = client_socket.recv(1024)
+            message, addr = client_socket.recvfrom(1024)
             if message:
                 print(message.decode())
-                
-            else:
-                break
         except:
             break
 
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 client_socket.connect((HOST, PORT))
 
 # Display connection info
 print(f"Connected to server: {HOST}:{PORT}")
-      
+
 # Start a thread to receive messages
 thread = threading.Thread(target=receive_messages, args=(client_socket,))
 thread.start()
@@ -40,9 +37,8 @@ while True:
             sentence += char
             sys.stdout.write(char)
             sys.stdout.flush()
-
     if sentence:
-        client_socket.sendall(sentence.encode())
+        client_socket.sendto(sentence.encode(), (HOST, PORT))
         sys.stdout.write(f"\n<You> {sentence}\n")
         sys.stdout.flush()
 

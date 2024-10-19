@@ -9,41 +9,30 @@ PORT = 65432
 clients = []
 
 # Function to broadcast messages to all clients
-def broadcast(message, client_socket, sender_info):
+def broadcast(message, sender_addr, sender_info):
     for client in clients:
-        if client != client_socket:
+        if client != sender_addr:
             try:
                 full_message = f"{sender_info}: {message.decode()}"
-                client.sendall(full_message.encode())
+                server.sendto(full_message.encode(), client)
             except:
-                client.close()
                 clients.remove(client)
 
-# Function to handle client connections
-def handle_client(client_socket, addr):
-    print(f"New connection from {addr}")
-    while True:
-        try:
-            message = client_socket.recv(1024)
-            if message:
-                sender_info = f"{addr[0]}:{addr[1]}"
-                print(f"Message from {sender_info} - {message.decode()}")
-                broadcast(message, client_socket, sender_info)
-            else:
-                break
-        except:
-            clients.remove(client_socket)
-            client_socket.close()
-            break
-
 # Setting up the server
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server.bind((HOST, PORT))
-server.listen()
 print(f"Server listening on {HOST}:{PORT}")
 
-while True:
-    client_socket, addr = server.accept()
-    clients.append(client_socket)
-    thread = threading.Thread(target=handle_client, args=(client_socket, addr))
-    thread.start()
+# Function to handle incoming messages
+def handle_messages():
+    while True:
+        message, addr = server.recvfrom(1024)
+        if addr not in clients:
+            clients.append(addr)
+        sender_info = f"{addr[0]}:{addr[1]}"
+        print(f"Message from {sender_info} - {message.decode()}")
+        broadcast(message, addr, sender_info)
+
+# Start the thread to handle incoming messages
+thread = threading.Thread(target=handle_messages)
+thread.start()
