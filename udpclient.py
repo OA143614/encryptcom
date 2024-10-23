@@ -2,6 +2,15 @@ import socket
 import threading
 import msvcrt
 import sys
+import rsa
+
+# Read the public key from the file
+with open('public_key.pem', 'r') as file:
+    publicKeyStr = file.read()
+
+# Load the public key from the serialized string
+loaded_publicKey = rsa.PublicKey.load_pkcs1(publicKeyStr.encode())
+
 
 # Server settings
 HOST = '127.0.0.1'
@@ -38,7 +47,8 @@ while True:
             sys.stdout.write(char)
             sys.stdout.flush()
     if sentence:
-        client_socket.sendto(sentence.encode(), (HOST, PORT))
+        encrpyt_message = rsa.encrypt(sentence.encode(), loaded_publicKey)
+        client_socket.sendto(encrpyt_message, (HOST, PORT))
         sys.stdout.write(f"\n<You> {sentence}\n")
         sys.stdout.flush()
 
