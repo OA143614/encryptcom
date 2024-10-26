@@ -1,5 +1,7 @@
 import socket
 import threading
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
 from Cryptodome.Cipher import AES
 import os
 
@@ -7,8 +9,15 @@ import os
 HOST = '127.0.0.1'
 PORT = 65432
 
-# Use a fixed AES key for simplicity
-aes_key = b'This is a key123This is a key123'  # 32 bytes
+# Generate RSA keys
+private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+public_key = private_key.public_key()
+
+# Serialize public key to send to client
+public_pem = public_key.public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo
+)
 
 # List to keep track of connected clients
 clients = []
@@ -27,22 +36,39 @@ def broadcast(message, sender_addr):
                 clients.remove(client)
 
 def handle_messages():
+    global aes_key
     while True:
         message, addr = server.recvfrom(4096)
-        if addr not in clients:
-            clients.append(addr)
-        # Decrypt message from client
-        iv = message[:16]
-        encrypted_message = message[16:]
-        cipher = AES.new(aes_key, AES.MODE_CFB, iv)
-        decrypted_message = cipher.decrypt(encrypted_message)
-        print(f"Received message from {addr}: {decrypted_message.decode('utf-8', errors='ignore')}")
-        
-        # Encrypt message and send to clients
-        iv = os.urandom(16)
-        cipher = AES.new(aes_key, AES.MODE_CFB, iv)
-        encrypted_response = iv + cipher.encrypt(decrypted_message)
-        broadcast(encrypted_response, addr)
+        if message == b"REQUEST_PUBLIC_KEY":
+            server.sendto(public_pem, addr)
+        elif message.startswith(b"KEY:"):
+            encrypted_key = message[4:]
+            aes_key = private_key.decrypt(
+                encrypted_key,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+            print(f"Received AES key: {aes_key}")
+            response = b"AES key received!"
+            server.sendto(response, addr)
+        else:
+            if addr not in clients:
+                clients.append(addr)
+            # Decrypt message from client
+            iv = message[:16]
+            encrypted_message = message[16:]
+            cipher = AES.new(aes_key, AES.MODE_CFB, iv)
+            decrypted_message = cipher.decrypt(encrypted_message)
+            print(f"Received message from {addr}: {decrypted_message.decode('utf-8', errors='ignore')}")
+            
+            # Encrypt message and send to clients
+            iv = os.urandom(16)
+            cipher = AES.new(aes_key, AES.MODE_CFB, iv)
+            encrypted_response = iv + cipher.encrypt(decrypted_message)
+            broadcast(encrypted_response, addr)
 
 # Start the thread to handle incoming messages
 thread = threading.Thread(target=handle_messages)
