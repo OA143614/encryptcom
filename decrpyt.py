@@ -20,8 +20,7 @@ public_pem = public_key.public_bytes(
     format=serialization.PublicFormat.SubjectPublicKeyInfo
 )
 
-# Generate a secure random 3DES key (24 bytes)
-des3_key = DES3.adjust_key_parity(get_random_bytes(24))
+
 
 # List to keep track of connected clients
 clients = []
@@ -55,9 +54,9 @@ def handle_messages():
                     label=None
                 )
             )
-            print(f"Received 3DES key: {des3_key}")
+            """ print(f"Received 3DES key: {des3_key}")
             response = b"3DES key received!"
-            server.sendto(response, addr)
+            server.sendto(response, addr) """
         else:
             if addr not in clients:
                 clients.append(addr)
@@ -71,7 +70,10 @@ def handle_messages():
             # Encrypt message and send to clients
             iv = get_random_bytes(8)
             cipher = DES3.new(des3_key, DES3.MODE_CFB, iv)
-            encrypted_response = iv + cipher.encrypt(decrypted_message)
+            sender_info = f"{addr[0]}:{addr[1]}"
+            full_message = f"{sender_info}: {decrypted_message.decode('utf-8', errors='ignore')}"
+            encrypted_response = iv + cipher.encrypt(full_message.encode('utf-8'))
+            #encrypted_response = iv + cipher.encrypt(decrypted_message)
             broadcast(encrypted_response, addr)
 
 # Start the thread to handle incoming messages

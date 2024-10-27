@@ -22,7 +22,7 @@ client_socket.sendto(b"REQUEST_PUBLIC_KEY", (HOST, PORT))
 # Receive the public key from the server
 try:
     public_pem, addr = client_socket.recvfrom(2048)
-    print(f"Received public key from {addr}")
+    #print(f"Received public key from {addr}")
     loaded_public_key = serialization.load_pem_public_key(public_pem)
 except Exception as e:
     print(f"Failed to receive public key: {e}")
@@ -54,7 +54,7 @@ def receive_messages(client_socket):
                 encrypted_message = message[8:]
                 cipher = DES3.new(des3_key, DES3.MODE_CFB, iv)
                 decrypted_message = cipher.decrypt(encrypted_message)
-                print(f"Server: {decrypted_message.decode('utf-8', errors='ignore')}")
+                print(decrypted_message.decode('utf-8', errors='ignore'))
         except Exception as e:
             print(f"Error receiving message: {e}")
             break
@@ -66,7 +66,7 @@ thread.start()
 
 while True:
     try:
-        sentence = input("Enter message to send: ")
+        sentence = input("")
         if sentence:
             iv = get_random_bytes(8)
             cipher = DES3.new(des3_key, DES3.MODE_CFB, iv)

@@ -51,9 +51,7 @@ def handle_messages():
                     label=None
                 )
             )
-            """ print(f"Received AES key: {aes_key}")
-            response = b"AES key received!"
-            server.sendto(response, addr) """
+           
         else:
             if addr not in clients:
                 clients.append(addr)
