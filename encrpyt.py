@@ -1,29 +1,38 @@
 import socket
-from cryptography.hazmat.primitives.asymmetric import padding
+import threading
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
-from cryptography.hazmat.backends import default_backend
+from Cryptodome.Cipher import DES3
+from Cryptodome.Random import get_random_bytes
 import os
 
-# Client settings
+# Server settings
 HOST = '127.0.0.1'
-PORT = 65411
+PORT = 65432
 
-client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client_socket.connect((HOST, PORT))
 
-# Request public key from server
-client.sendto(b"REQUEST_PUBLIC_KEY", (HOST, PORT))
-public_pem, _ = client.recvfrom(4096)
+# Display connection info
+print(f"Connected to server: {HOST}:{PORT}")
 
-# Load public key
-public_key = serialization.load_pem_public_key(public_pem)
+# Request public key from the server
+client_socket.sendto(b"REQUEST_PUBLIC_KEY", (HOST, PORT))
 
-# Generate RC4 key
-rc4_key = os.urandom(16)
+# Receive the public key from the server
+try:
+    public_pem, addr = client_socket.recvfrom(2048)
+    print(f"Received public key from {addr}")
+    loaded_public_key = serialization.load_pem_public_key(public_pem)
+except Exception as e:
+    print(f"Failed to receive public key: {e}")
 
-# Encrypt RC4 key with server's public key
-encrypted_key = public_key.encrypt(
-    rc4_key,
+# Generate a valid 3DES key for encryption (24 bytes)
+des3_key = b'\x7fk\x80\x8f\xba\xbc\xcbL\x97\x9b\xa7\xe9R\x0e\x0b\xdc\ry\xf7\xd3u\xfe*\xf8'
+#print(des3_key)
+# Encrypt the 3DES key with the server's public key
+encrypted_des3_key = loaded_public_key.encrypt(
+    des3_key, 
     padding.OAEP(
         mgf=padding.MGF1(algorithm=hashes.SHA256()),
         algorithm=hashes.SHA256(),
@@ -31,22 +40,40 @@ encrypted_key = public_key.encrypt(
     )
 )
 
-# Send encrypted RC4 key to server
-client.sendto(b"KEY:" + encrypted_key, (HOST, PORT))
-response, _ = client.recvfrom(1024)
-print(response.decode())
+# Send the encrypted 3DES key to the server
+client_socket.sendto(b"KEY:" + encrypted_des3_key, (HOST, PORT))
 
-# Encrypt a message using RC4
-message = b"Hello from client!"
-cipher = Cipher(algorithms.ARC4(rc4_key), mode=None, backend=default_backend())
-encryptor = cipher.encryptor()
-encrypted_message = encryptor.update(message)
+# Function to receive messages from the server
+def receive_messages(client_socket):
+    while True:
+        try:
+            message, addr = client_socket.recvfrom(1024)
+            if message:
+                # Decrypt the message using the 3DES key
+                iv = message[:8]
+                encrypted_message = message[8:]
+                cipher = DES3.new(des3_key, DES3.MODE_CFB, iv)
+                decrypted_message = cipher.decrypt(encrypted_message)
+                print(f"Server: {decrypted_message.decode('utf-8', errors='ignore')}")
+        except Exception as e:
+            print(f"Error receiving message: {e}")
+            break
 
-# Send encrypted message to server
-client.sendto(encrypted_message, (HOST, PORT))
+# Start a thread to receive messages
+thread = threading.Thread(target=receive_messages, args=(client_socket,))
+thread.daemon = True
+thread.start()
 
-# Receive and decrypt the response from the server
-encrypted_response, _ = client.recvfrom(1024)
-decryptor = cipher.decryptor()
-response = decryptor.update(encrypted_response)
-print(f"Received response from server: {response.decode()}")
+while True:
+    try:
+        sentence = input("Enter message to send: ")
+        if sentence:
+            iv = get_random_bytes(8)
+            cipher = DES3.new(des3_key, DES3.MODE_CFB, iv)
+            encrypted_message = iv + cipher.encrypt(sentence.encode('utf-8'))
+            client_socket.sendto(encrypted_message, (HOST, PORT))
+            print(f"You: {sentence}")
+    except KeyboardInterrupt:
+        print("\nConnection closed.")
+        client_socket.close()
+        break

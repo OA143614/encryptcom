@@ -60,12 +60,12 @@ def receive_messages(client_socket):
 
 # Start a thread to receive messages
 thread = threading.Thread(target=receive_messages, args=(client_socket,))
-thread.daemon = True
+#thread.daemon = True
 thread.start()
 
 while True:
     try:
-        sentence = input("Enter message to send: \n")
+        sentence = input("")
         if sentence:
             iv = os.urandom(16)
             cipher = AES.new(aes_key, AES.MODE_CFB, iv)

@@ -51,9 +51,9 @@ def handle_messages():
                     label=None
                 )
             )
-            print(f"Received AES key: {aes_key}")
+            """ print(f"Received AES key: {aes_key}")
             response = b"AES key received!"
-            server.sendto(response, addr)
+            server.sendto(response, addr) """
         else:
             if addr not in clients:
                 clients.append(addr)
@@ -67,9 +67,11 @@ def handle_messages():
             # Encrypt message and send to clients
             iv = os.urandom(16)
             cipher = AES.new(aes_key, AES.MODE_CFB, iv)
-            encrypted_response = iv + cipher.encrypt(decrypted_message)
+            sender_info = f"{addr[0]}:{addr[1]}"
+            full_message = f"{sender_info}: {decrypted_message.decode('utf-8', errors='ignore')}"
+            encrypted_response = iv + cipher.encrypt(full_message.encode('utf-8'))
             broadcast(encrypted_response, addr)
-
+      
 # Start the thread to handle incoming messages
 thread = threading.Thread(target=handle_messages)
 thread.start()
