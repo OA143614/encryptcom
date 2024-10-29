@@ -37,14 +37,20 @@ public_key = load_public_key(public_pem)
 # Choose encryption method
 encryption_method = input("Choose encryption method (unencrypted/3DES/AES): ")
 
+session_key = None
+iv_size = 0
+
 if encryption_method == '3DES':
     session_key = b'\x7fk\x80\x8f\xba\xbc\xcbL\x97\x9b\xa7\xe9R\x0e\x0b\xdc\ry\xf7\xd3u\xfe*\xf8'  # 3DES key size
     iv_size = 8
 elif encryption_method == 'AES':
     session_key = b'\x92\x0f\xfa{\xe3u>H\xf9\x9e\x02\xc7T\xdd6\xec\xfc\x9d0\x18\xbf\x06\x9eu\x81\x90\xa1\x85T\xa6o\xf5'  # AES key size
     iv_size = 16
+elif encryption_method == 'unencrypted':
+    iv_size = 0
 else:
-    session_key = None
+    print("Invalid encryption method chosen.")
+    exit()
 
 if session_key:
     encrypted_session_key = encrypt_session_key(public_key, session_key)
