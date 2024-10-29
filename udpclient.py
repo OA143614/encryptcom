@@ -9,13 +9,15 @@ PORT = 65431
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Choose encryption method
-encryption_method = input("Choose encryption method (unencrypted): ")
+encryption_method = input("Choose encryption method (unencrypted/AES): ")
 
 def receive_messages(client_socket):
     while True:
         try:
             message, _ = client_socket.recvfrom(4096)
             if encryption_method == 'unencrypted':
+                print(f"Server: {message.decode('utf-8', errors='ignore')}")
+            elif encryption_method == 'AES':
                 print(f"Server: {message.decode('utf-8', errors='ignore')}")
         except Exception as e:
             print(f"Error receiving message: {e}")
@@ -34,6 +36,10 @@ while True:
         sentence = input("")
         if sentence:
             if encryption_method == 'unencrypted':
+                message = sentence.encode('utf-8')
+                client.sendto(message, (HOST, PORT))
+            elif encryption_method == 'AES':
+                # Placeholder for AES encryption logic
                 message = sentence.encode('utf-8')
                 client.sendto(message, (HOST, PORT))
             print(f"You: {sentence}")
