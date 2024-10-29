@@ -24,46 +24,36 @@ def broadcast(message, sender_addr):
                     print(f"Error sending message to {client}: {e}")
                     clients.remove(client)
 
-def handle_client(addr, choice):
-    if choice == 'unencrypted':
-        while True:
-            try:
-                message, addr = server.recvfrom(4096)
-                if message:
-                    decoded_message = message.decode('utf-8', errors='ignore')
-                    sender_info = f"{addr[0]}:{addr[1]}"
-                    full_message = f"{sender_info}: {decoded_message}"
-                    print(f"Message from {sender_info} - {decoded_message}")
-                    broadcast(full_message.encode('utf-8'), addr)
-            except UnicodeDecodeError as e:
-                print(f"Unicode decode error: {e}")
-            except Exception as e:
-                print(f"Error handling client message: {e}")
-                break
+def handle_client(addr):
+    while True:
+        try:
+            message, addr = server.recvfrom(4096)
+            if message:
+                decoded_message = message.decode('utf-8', errors='ignore')
+                sender_info = f"{addr[0]}:{addr[1]}"
+                full_message = f"{sender_info}: {decoded_message}"
+                print(f"Message from {sender_info} - {decoded_message}")
+                broadcast(full_message.encode('utf-8'), addr)
+        except UnicodeDecodeError as e:
+            print(f"Unicode decode error: {e}")
+        except Exception as e:
+            print(f"Error handling client message: {e}")
+            break
 
 while True:
-    message, addr = server.recvfrom(4096)
-    choice_decoded_message = message.decode('utf-8', errors='ignore')
     try:
         # Receive message from client
         message, addr = server.recvfrom(4096)
         decoded_message = message.decode('utf-8', errors='ignore')
         print(f"Received message: {decoded_message} from {addr}")
 
-        # Send a response back to the client
-        #response = "Message received"
-        #server.sendto(response.encode(), addr)
-
         # Track connected clients
         with clients_lock:
             if addr not in clients:
                 clients.append(addr)
-        print(decoded_message)
 
-        # Track client choices
-        threading.Thread(target=handle_client, args=(addr, choice_decoded_message)).start()
-
-        #print("Clients:", clients)
+        # Start a new thread to handle the client
+        threading.Thread(target=handle_client, args=(addr,)).start()
     except UnicodeDecodeError as e:
         print(f"Unicode decode error: {e}")
     except Exception as e:

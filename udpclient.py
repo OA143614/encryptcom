@@ -25,10 +25,12 @@ thread = threading.Thread(target=receive_messages, args=(client,))
 thread.daemon = True
 thread.start()
 
+# Send the encryption method choice once
+choice_method = encryption_method.encode('utf-8')
+client.sendto(choice_method, (HOST, PORT))
+
 while True:
     try:
-        choice_method = encryption_method.encode('utf-8')
-        client.sendto(choice_method, (HOST, PORT))
         sentence = input("")
         if sentence:
             if encryption_method == 'unencrypted':
