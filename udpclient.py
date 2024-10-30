@@ -9,18 +9,21 @@ PORT = 65431
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Choose encryption method
-encryption_method = input("Choose encryption method (unencrypted/AES): ")
+encryption_method = input("Choose encryption method (unencrypted): ")
+
+# Flag to stop the receiving thread
+stop_thread = threading.Event()
 
 def receive_messages(client_socket):
-    while True:
+    while not stop_thread.is_set():
         try:
             message, _ = client_socket.recvfrom(4096)
             if encryption_method == 'unencrypted':
                 print(f"Server: {message.decode('utf-8', errors='ignore')}")
-            elif encryption_method == 'AES':
-                print(f"Server: {message.decode('utf-8', errors='ignore')}")
         except Exception as e:
-            print(f"Error receiving message: {e}")
+            if not stop_thread.is_set():
+                print(f"Error receiving message: {e}")
+            break
 
 # Start a thread to receive messages
 thread = threading.Thread(target=receive_messages, args=(client,))
@@ -31,19 +34,16 @@ thread.start()
 choice_method = encryption_method.encode('utf-8')
 client.sendto(choice_method, (HOST, PORT))
 
-while True:
-    try:
+try:
+    while True:
         sentence = input("")
         if sentence:
             if encryption_method == 'unencrypted':
                 message = sentence.encode('utf-8')
                 client.sendto(message, (HOST, PORT))
-            elif encryption_method == 'AES':
-                # Placeholder for AES encryption logic
-                message = sentence.encode('utf-8')
-                client.sendto(message, (HOST, PORT))
             print(f"You: {sentence}")
-    except KeyboardInterrupt:
-        print("\nConnection closed.")
-        client.close()
-        break
+except KeyboardInterrupt:
+    print("\nConnection closed.")
+finally:
+    stop_thread.set()
+    client.close()
