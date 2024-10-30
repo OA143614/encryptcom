@@ -18,18 +18,16 @@ def receive_messages(client_socket):
     #print(client_socket)
     while not stop_thread.is_set():
         try:
-            message, addr = client_socket.recvfrom(4096)
+            message, _ = client_socket.recvfrom(4096)
             if encryption_method == 'unencrypted':
                 print(f"Server: {message.decode('utf-8', errors='ignore')}")
+            
         except Exception as e:
             if not stop_thread.is_set():
                 print(f"Error receiving message: {e}")
             break
 
-# Start a thread to receive messages
-thread = threading.Thread(target=receive_messages, args=(client,))
-thread.daemon = True
-thread.start()
+
 
 # Send the encryption method choice once
 choice_method = encryption_method.encode('utf-8')
@@ -43,6 +41,10 @@ try:
                 message = sentence.encode('utf-8')
                 client.sendto(message, (HOST, PORT))
             print(f"You: {sentence}")
+        # Start a thread to receive messages
+        thread = threading.Thread(target=receive_messages, args=(client,))
+        thread.daemon = True
+        thread.start()
 except KeyboardInterrupt:
     print("\nConnection closed.")
 finally:

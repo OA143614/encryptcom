@@ -60,7 +60,7 @@ def main():
                 
                 if addr not in clients:
                     clients.append(addr)
-                    threading.Thread(target=handle_client, args=(addr,)).start()
+            threading.Thread(target=handle_client, args=(addr,)).start()
 
 if __name__ == "__main__":
     main()
