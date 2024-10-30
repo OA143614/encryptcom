@@ -15,9 +15,10 @@ encryption_method = input("Choose encryption method (unencrypted): ")
 stop_thread = threading.Event()
 
 def receive_messages(client_socket):
+    #print(client_socket)
     while not stop_thread.is_set():
         try:
-            message, _ = client_socket.recvfrom(4096)
+            message, addr = client_socket.recvfrom(4096)
             if encryption_method == 'unencrypted':
                 print(f"Server: {message.decode('utf-8', errors='ignore')}")
         except Exception as e:
