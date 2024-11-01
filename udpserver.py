@@ -161,7 +161,10 @@ def main():
                     )
                 )
                 print(des3_key)
-
+                # Receive debug mode from client
+                message, addr = server.recvfrom(4096)
+                debug_message = message.decode('utf-8', errors='ignore')
+                print(f"debug mode message: {debug_message} from {addr}")
                 # Receive message from client
                 message, addr = server.recvfrom(4096)
                 choice_decoded_message = message.decode('utf-8', errors='ignore')
