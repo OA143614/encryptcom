@@ -38,16 +38,19 @@ encryption_method = input("Choose encryption method (unencrypted/AES): ")
 # Flag to stop the receiving thread
 stop_thread = threading.Event()
 
-def receive_messages(client_socket):
+def receive_messages(client_socket,encryption_method):
     #print(client_socket)
-    while not stop_thread.is_set():
+    while True:               #not stop_thread.is_set():
+        print("stay")
         try:
             message, _ = client_socket.recvfrom(4096)
             if encryption_method == 'unencrypted':
                 #print(message_choice)
+                #message, _ = client_socket.recvfrom(4096)
                 print(f"Server: {message.decode('utf-8', errors='ignore')}")
             elif encryption_method == 'AES':
                 #print(message_choice)
+                message, _ = client_socket.recvfrom(4096)
                 iv = message[:16]
                 encrypted_message = message[16:]
                 cipher = AES.new(aes_key, AES.MODE_CFB, iv)
@@ -78,7 +81,7 @@ try:
                 client.sendto(encrypted_message, (HOST, PORT))
             print(f"You: {sentence}")
         # Start a thread to receive messages
-        thread = threading.Thread(target=receive_messages, args=(client,))
+        thread = threading.Thread(target=receive_messages, args=(client,encryption_method))
         thread.daemon = True
         thread.start()
 except KeyboardInterrupt:
