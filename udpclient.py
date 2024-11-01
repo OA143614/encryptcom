@@ -2,7 +2,8 @@ import socket
 import threading
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
-from Cryptodome.Cipher import AES
+from Cryptodome.Cipher import DES3, AES
+from Cryptodome.Random import get_random_bytes
 import os
 
 # Server settings
@@ -32,12 +33,29 @@ encrypted_aes_key = loaded_public_key.encrypt(
 # Send the encrypted AES key to the server
 client.sendto(encrypted_aes_key, (HOST, PORT))
 
+# Generate a valid 3DES key for encryption (24 bytes)
+des3_key = b'\x7fk\x80\x8f\xba\xbc\xcbL\x97\x9b\xa7\xe9R\x0e\x0b\xdc\ry\xf7\xd3u\xfe*\xf8'
+#print(des3_key)
+# Encrypt the 3DES key with the server's public key
+encrypted_des3_key = loaded_public_key.encrypt(
+    des3_key, 
+    padding.OAEP(
+        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+        algorithm=hashes.SHA256(),
+        label=None
+    )
+)
+
+# Send the encrypted 3DES key to the server
+client.sendto(encrypted_des3_key, (HOST, PORT))
+
 # Choose encryption method
 encryption_method = input("Choose encryption method (unencrypted/AES): ")
 
 # Flag to stop the receiving thread
 stop_thread = threading.Event()
 
+#for recieve message from server
 def receive_messages(client_socket,encryption_method):
     #print(client_socket)
     while True:               #not stop_thread.is_set():
@@ -47,15 +65,23 @@ def receive_messages(client_socket,encryption_method):
             if encryption_method == 'unencrypted':
                 #print(message_choice)
                 #message, _ = client_socket.recvfrom(4096)
-                print(f"Server: {message.decode('utf-8', errors='ignore')}")
+                print(message.decode('utf-8', errors='ignore'))
             elif encryption_method == 'AES':
                 #print(message_choice)
-                message, _ = client_socket.recvfrom(4096)
-                iv = message[:16]
+                #message, _ = client_socket.recvfrom(4096)
+                iv_aes = message[:16]
                 encrypted_message = message[16:]
-                cipher = AES.new(aes_key, AES.MODE_CFB, iv)
+                cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
                 decrypted_message = cipher.decrypt(encrypted_message)
                 print(decrypted_message.decode('utf-8', errors='ignore'))
+            elif encryption_method == '3DES':
+                print('3DES_recienve')
+                iv_des = message[:8]
+                encrypted_message = message[8:]
+                cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
+                decrypted_message = cipher.decrypt(encrypted_message)
+                print(decrypted_message.decode('utf-8', errors='ignore'))
+            print(f"You: {sentence}")
         except Exception as e:
             if not stop_thread.is_set():
                 print(f"Error receiving message: {e}")
@@ -75,15 +101,20 @@ try:
                 message = sentence.encode('utf-8')
                 client.sendto(message, (HOST, PORT))
             elif encryption_method == 'AES':
-                iv = os.urandom(16)
-                cipher = AES.new(aes_key, AES.MODE_CFB, iv)
-                encrypted_message = iv + cipher.encrypt(sentence.encode('utf-8'))
+                iv_aes = os.urandom(16)
+                cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
+                encrypted_message = iv_aes + cipher.encrypt(sentence.encode('utf-8'))
+                client.sendto(encrypted_message, (HOST, PORT))
+            elif encryption_method == '3DES':
+                iv_des = get_random_bytes(8)
+                cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
+                encrypted_message = iv_des + cipher.encrypt(sentence.encode('utf-8'))
                 client.sendto(encrypted_message, (HOST, PORT))
             print(f"You: {sentence}")
-        # Start a thread to receive messages
-        thread = threading.Thread(target=receive_messages, args=(client,encryption_method))
-        thread.daemon = True
-        thread.start()
+            # Start a thread to receive messages
+            thread = threading.Thread(target=receive_messages, args=(client,encryption_method))
+            thread.daemon = True
+            thread.start()
 except KeyboardInterrupt:
     print("\nConnection closed.")
 finally:

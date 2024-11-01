@@ -39,12 +39,6 @@ logging.info(f"Server listening on {HOST}:{PORT}")
 #broad
 
 def broadcast(message, reciever_addr):
-    #logging.info(f"Broadcasting message to {reciever_addr} to clients: {clients}")
-    #with clients_lock:
-    #for client in clients:
-        #print(client,sender_addr)
-        #if client != sender_addr:
-            #print(client)
     try:
         server.sendto(message, reciever_addr)
         logging.info(f"Message sent to {reciever_addr}")
@@ -52,15 +46,12 @@ def broadcast(message, reciever_addr):
         logging.error(f"Error sending message to {reciever_addr}: {e}")
         clients.remove(reciever_addr)
 
-#broadcast to different choice
+#broadcast to reciever's choice
+
 def choice_message(decrypted_message,addr,clients_choice):
-    print(addr)
-    #with clients_lock:
     logging.info(f"choice_message called with addr: {addr} and clients_choice: {clients_choice}")
     for client, choice in clients_choice:
         if client != addr:
-            print("choose to send")
-            print(choice,client)
             logging.info(f"Processing message for client: {client} with choice: {choice}")
             if choice == "unencrypted":
                 decoded_message = decrypted_message   #.decode('utf-8', errors='ignore')
@@ -69,13 +60,24 @@ def choice_message(decrypted_message,addr,clients_choice):
                 print(f"Message from {sender_info} - {decoded_message}")
                 broadcast(full_message.encode('utf-8'), client)
             elif choice == "AES":
-                iv = os.urandom(16)
-                cipher = AES.new(aes_key, AES.MODE_CFB, iv)
+                iv_aes = os.urandom(16)
+                cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
                 sender_info = f"{addr[0]}:{addr[1]}"
                 full_message = f"{sender_info}: {decrypted_message}"   #.decode('utf-8', errors='ignore')}"
-                encrypted_response = iv + cipher.encrypt(full_message.encode('utf-8'))
-                logging.info(f"Encrypted response: {encrypted_response}")
+                encrypted_response = iv_aes + cipher.encrypt(full_message.encode('utf-8'))
+                logging.info(f"AES Encrypted response: {encrypted_response}")
                 broadcast(encrypted_response, client)
+            elif choice == "3DES":
+                iv_des = os.urandom(8)
+                cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
+                sender_info = f"{addr[0]}:{addr[1]}"
+                full_message = f"{sender_info}: {decrypted_message}"    #.decode('utf-8', errors='ignore')
+                print(full_message)
+                encrypted_response = iv_des + cipher.encrypt(full_message.encode('utf-8'))
+                logging.info(f"DES3 Encrypted response: {encrypted_response}")
+                #encrypted_response = iv + cipher.encrypt(decrypted_message)
+                broadcast(encrypted_response, client)
+
 
 def sender_handle_client(addr,client_choice):
    
@@ -92,22 +94,27 @@ def sender_handle_client(addr,client_choice):
                             if choice == "unencrypted":
                                 if message:
                                     decoded_message = message.decode('utf-8', errors='ignore')
-                                    sender_info = f"{addr[0]}:{addr[1]}"
                                     #full_message = f"{sender_info}: {decoded_message}"
                                     print(f"Message from {addr} - {decoded_message}")
                                     choice_message(decoded_message,addr,client_choice)
                                     #broadcast(full_message.encode('utf-8'), addr)
                             elif choice == "AES": 
                                 if message:
-                                    iv = message[:16]
+                                    iv_aes = message[:16]
                                     encrypted_message = message[16:]
-                                    cipher = AES.new(aes_key, AES.MODE_CFB, iv)
+                                    cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
                                     decrypted_message = cipher.decrypt(encrypted_message)
                                     logging.info(f"Decrypted message from {addr}: {decrypted_message}")
                                     #print(f"Received message from {addr}: {decrypted_message.decode('utf-8', errors='ignore')}")
                                     choice_message(decrypted_message,addr,client_choice)
-
-                        
+                            elif choice == "3DES":
+                                if message:
+                                    iv_des = message[:8]
+                                    encrypted_message = message[8:]
+                                    cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
+                                    decrypted_message = cipher.decrypt(encrypted_message)
+                                    logging.info(f"Decrypted message from {addr}: {decrypted_message}")
+                                    choice_message(decrypted_message,addr,client_choice)      
       
             except UnicodeDecodeError as e:
                 logging.error(f"Unicode decode error: {e}")
@@ -120,6 +127,7 @@ def sender_handle_client(addr,client_choice):
 
 def main():
     global aes_key
+    global des3_key
     while True:
         with clients_lock:
             #Handle 2 clients
@@ -140,10 +148,25 @@ def main():
                     )
                 )
                 print(aes_key)
+                
+                #receive 3DES key
+                message, addr = server.recvfrom(4096)
+                encrypted_key = message
+                des3_key = private_key.decrypt(
+                        encrypted_key,
+                        padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+                print(des3_key)
+
                 # Receive message from client
                 message, addr = server.recvfrom(4096)
                 choice_decoded_message = message.decode('utf-8', errors='ignore')
                 print(f"Received message: {choice_decoded_message} from {addr}")
+
                 
                 if addr not in clients:
                     clients.append(addr)
