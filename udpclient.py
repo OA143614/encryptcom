@@ -1,14 +1,19 @@
 import socket
 import threading
+import logging
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 from Cryptodome.Cipher import DES3, AES
 from Cryptodome.Random import get_random_bytes
 import os
+import sys
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Server settings
-HOST = '127.0.0.1'
-PORT = 65431
+HOST = str(sys.argv[1]) #= '127.0.0.1'
+PORT = int(sys.argv[2])   #65431
 
 # Create a UDP socket
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -53,26 +58,27 @@ client.sendto(encrypted_des3_key, (HOST, PORT))
 stop_thread = threading.Event()
 
 #for recieve message from server
-def receive_messages(client_socket,encryption_method):
+def receive_messages(client_socket,encryption_method,debug_option):
+    if debug_option == 'on':
+        logging.info(f"Client Socket: {client_socket}")
+
     #print(client_socket)
-    while True:               #not stop_thread.is_set():
-        print("stay")
+    while True:
+        if debug_option == 'on':
+            logging.info("Listening for messages...")
         try:
             message, _ = client_socket.recvfrom(4096)
+            if debug_option == 'on':
+                logging.info(f"Raw message received: {message}")
             if encryption_method == 'unencrypted':
-                #print(message_choice)
-                #message, _ = client_socket.recvfrom(4096)
                 print(message.decode('utf-8', errors='ignore'))
             elif encryption_method == 'AES':
-                #print(message_choice)
-                #message, _ = client_socket.recvfrom(4096)
                 iv_aes = message[:16]
                 encrypted_message = message[16:]
                 cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
                 decrypted_message = cipher.decrypt(encrypted_message)
                 print(decrypted_message.decode('utf-8', errors='ignore'))
             elif encryption_method == '3DES':
-                print('3DES_recienve')
                 iv_des = message[:8]
                 encrypted_message = message[8:]
                 cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
@@ -84,10 +90,12 @@ def receive_messages(client_socket,encryption_method):
                 print(f"Error receiving message: {e}")
             break
 
-def send_message(encryption_method):
+def send_message(encryption_method,debug_option):
+    if debug_option == 'on':
+        logging.info(f"Starting send_message with encryption method: {encryption_method}")
     encryption_method = encryption_method
     # Start a thread to receive messages
-    thread = threading.Thread(target=receive_messages, args=(client,encryption_method))
+    thread = threading.Thread(target=receive_messages, args=(client,encryption_method,debug_option))
     thread.daemon = True
     thread.start()
     try:
@@ -95,19 +103,27 @@ def send_message(encryption_method):
         while True:
             sentence = input("")
             if sentence:
+                if debug_option == 'on':
+                    logging.info(f"Message to send: {sentence}")
                 if encryption_method == 'unencrypted':
                     message = sentence.encode('utf-8')
                     client.sendto(message, (HOST, PORT))
+                    if debug_option == 'on':
+                        logging.info("Sent unencrypted message")
                 elif encryption_method == 'AES':
                     iv_aes = os.urandom(16)
                     cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
                     encrypted_message = iv_aes + cipher.encrypt(sentence.encode('utf-8'))
                     client.sendto(encrypted_message, (HOST, PORT))
+                    if debug_option == 'on':
+                        logging.info("Sent AES encrypted message")
                 elif encryption_method == '3DES':
                     iv_des = get_random_bytes(8)
                     cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
                     encrypted_message = iv_des + cipher.encrypt(sentence.encode('utf-8'))
                     client.sendto(encrypted_message, (HOST, PORT))
+                    if debug_option == 'on':
+                        logging.info("Sent 3DES encrypted message")
                 print(f"You: {sentence}")
             
             
@@ -132,24 +148,23 @@ def user_interaction():
                 #encryption_method = None  # Initialize the variable
                 debug_option = input("Please choose on/off log:\nType 'on' for on log\nType 'off' for off log:\n")
                 if debug_option in ['on', 'off']:
-                    send_option(debug_option)
-                    
+                   
                     chose_encryption_method = input("Choose encryption method (u/a1/a2): ")
                     if chose_encryption_method == 'u':
                         encryption_method = 'unencrypted'
                         # Send the encryption method choice once
                         send_option(encryption_method)
-                        send_message(encryption_method)
+                        send_message(encryption_method,debug_option)
                     elif chose_encryption_method == 'a1':
                         encryption_method = 'AES'
                         # Send the encryption method choice once
                         send_option(encryption_method)
-                        send_message(encryption_method)
+                        send_message(encryption_method,debug_option)
                     elif chose_encryption_method == 'a2':
                         encryption_method = '3DES'
                         # Send the encryption method choice once
                         send_option(encryption_method)
-                        send_message(encryption_method)
+                        send_message(encryption_method,debug_option)
                     else:
                         print("Invalid option. Please try again.") 
                         continue
