@@ -141,7 +141,7 @@ def user_interaction():
     while True:
         choose_option = input("Please select an option:\n1. Help\n2. Debug and Mode\n")
         if choose_option == '1':
-            print("Help")
+            print("press 2 to choose debug mode press on for displaying log press off for not display log. \nThen press u for unencrypt, press a1 for AES encryption, and press a2 for 3DES encryption.")
             user_interaction()
         elif choose_option == '2':
             while True:
