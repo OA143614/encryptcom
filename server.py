@@ -65,110 +65,94 @@ def choice_message(decrypted_message, addr):
                 logging.info(f"DES3 Encrypted response: {encrypted_response}")
                 broadcast(encrypted_response, client)
 
-# Managing received choice and message of sender
-def sender_handle_client(addr):
-    while True:
-        try:
-            message, addr = server.recvfrom(4096)
-            if addr in clients_choice:
-                choice = clients_choice[addr]
-                logging.info(f"Processing message for client: {addr} with choice: {choice}")
-                if choice == "unencrypted":
-                    if message:
-                        decoded_message = message.decode('utf-8', errors='ignore')
-                        print(f"Message from {addr} - {decoded_message}")
-                        choice_message(decoded_message.encode('utf-8'), addr)
-                elif choice == "AES":
-                    if message:
-                        iv_aes = message[:16]
-                        encrypted_message = message[16:]
-                        cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
-                        decrypted_message = cipher.decrypt(encrypted_message)
-                        logging.info(f"Decrypted message from {addr}: {decrypted_message}")
-                        choice_message(decrypted_message, addr)
-                elif choice == "3DES":
-                    if message:
-                        iv_des = message[:8]
-                        encrypted_message = message[8:]
-                        cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
-                        decrypted_message = cipher.decrypt(encrypted_message)
-                        logging.info(f"Decrypted message from {addr}: {decrypted_message}")
-                        choice_message(decrypted_message, addr)
-            pass
-        except UnicodeDecodeError as e:
-            logging.error(f"Unicode decode error: {e}")
-        except Exception as e:
-            logging.error(f"Error handling client message: {e}")
-            break
-
-def main():
-    global aes_key
-    global des3_key
-    global server
+def sender_handle_client(addr, message):
     try:
-        server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        server.bind((HOST, PORT))
-        logging.info(f"Server listening on {HOST}:{PORT}")
-
-        while True:
-            try:
-                message, addr = server.recvfrom(4096)
-                logging.info(f"Received message from {addr}: {message.decode()}")
-                receive_message = message.decode()
-
-                if receive_message == 'connect' and addr not in clients:
-                    clients.append(addr)
-                    server.sendto(public_pem, addr)
-                    logging.info(f"Sent public key to {addr}")
-
-                    # Receive AES key
-                    message, addr = server.recvfrom(4096)
-                    encrypted_key = message
-                    aes_key = private_key.decrypt(
-                        encrypted_key,
-                        padding.OAEP(
-                            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                            algorithm=hashes.SHA256(),
-                            label=None
-                        )
-                    )
-                    logging.info(f"Received and decrypted AES key from {addr}")
-
-                    # Receive 3DES key
-                    message, addr = server.recvfrom(4096)
-                    encrypted_key = message
-                    des3_key = private_key.decrypt(
-                        encrypted_key,
-                        padding.OAEP(
-                            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                            algorithm=hashes.SHA256(),
-                            label=None
-                        )
-                    )
-                    logging.info(f"Received and decrypted 3DES key from {addr}")
-                    logging.info(f"New client added: {addr}")
-                    print(clients)
-
-                elif receive_message in ['unencrypted', 'AES', '3DES']:
-                    clients_choice[addr] = receive_message
-                    logging.info(f"Client {addr} chose {receive_message} encryption")
-                    print(clients_choice)
-
-                else:
-                    sender_handle_client(addr)
-                    
-            except KeyboardInterrupt:
-                logging.info("Server is shutting down due to keyboard interrupt.")
-                break
-            except Exception as e:
-                logging.error(f"Error receiving message: {e}")
+        if addr in clients_choice:
+            choice = clients_choice[addr]
+            logging.info(f"Processing message for client: {addr} with choice: {choice}")
+            if choice == "unencrypted":
+                if isinstance(message, bytes):
+                    decoded_message = message.decode('utf-8', errors='ignore')
+                    print(f"Message from {addr} - {decoded_message}")
+                    choice_message(decoded_message.encode('utf-8'), addr)
+            elif choice == "AES":
+                if isinstance(message, bytes):
+                    iv_aes = message[:16]
+                    encrypted_message = message[16:]
+                    cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
+                    decrypted_message = cipher.decrypt(encrypted_message)
+                    logging.info(f"Decrypted message from {addr}: {decrypted_message}")
+                    choice_message(decrypted_message, addr)
+            elif choice == "3DES":
+                if isinstance(message, bytes):
+                    iv_des = message[:8]
+                    encrypted_message = message[8:]
+                    cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
+                    decrypted_message = cipher.decrypt(encrypted_message)
+                    logging.info(f"Decrypted message from {addr}: {decrypted_message}")
+                    choice_message(decrypted_message, addr)
+    except UnicodeDecodeError as e:
+        logging.error(f"Unicode decode error: {e}")
     except Exception as e:
-        logging.error(f"Failed to set up server: {e}")
-    finally:
-        server.close()
-        logging.info("Server shut down.")
+        logging.error(f"Error handling client message: {e}")
+
+while True:
+    server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server.bind((HOST, PORT))
+    logging.info(f"Server listening on {HOST}:{PORT}")
+    try:
+        message, addr = server.recvfrom(4096)
+        logging.info(f"Received message from {addr}")
         
+        if isinstance(message, bytes):
+            receive_message = message.decode('utf-8', errors='ignore')
+        else:
+            receive_message = message
 
+        if receive_message == 'connect' and addr not in clients:
+            clients.append(addr)
+            server.sendto(public_pem, addr)
+            logging.info(f"Sent public key to {addr}")
 
-if __name__ == "__main__":
-    main()
+            # Receive AES key
+            message, addr = server.recvfrom(4096)
+            encrypted_key = message
+            aes_key = private_key.decrypt(
+                encrypted_key,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+            logging.info(f"Received and decrypted AES key from {addr}")
+
+            # Receive 3DES key
+            message, addr = server.recvfrom(4096)
+            encrypted_key = message
+            des3_key = private_key.decrypt(
+                encrypted_key,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+            logging.info(f"Received and decrypted 3DES key from {addr}")
+            logging.info(f"New client added: {addr}")
+            print(clients)
+
+        elif receive_message in ['unencrypted', 'AES', '3DES']:
+            clients_choice[addr] = receive_message
+            logging.info(f"Client {addr} chose {receive_message} encryption")
+            print(clients_choice)
+
+        else:
+            sender_handle_client(addr, message)
+
+    except KeyboardInterrupt:
+        logging.info("Server is shutting down due to keyboard interrupt.")
+        break
+    except Exception as e:
+        logging.error(f"Error receiving message: {e}")
+        
