@@ -16,43 +16,50 @@ encryption_method = 'unencrypted'  # Default encryption method
 aes_key = None
 des3_key = None
 
+display_log = False
+
 # Function to receive messages from the server
 def receive_messages():
-    global encryption_method, aes_key, des3_key
+    global encryption_method, aes_key, des3_key, display_log
     while True:
         try:
             message, _ = client.recvfrom(4096)
             if encryption_method == 'unencrypted':
-                print(message.decode('utf-8', errors='ignore'))
+                decrypted_message = message.decode('utf-8', errors='ignore')
             elif encryption_method == 'AES':
                 iv_aes = message[:16]
                 encrypted_message = message[16:]
                 cipher = AES.new(aes_key, AES.MODE_CFB, iv_aes)
-                decrypted_message = cipher.decrypt(encrypted_message)
-                print(decrypted_message.decode('utf-8', errors='ignore'))
+                decrypted_message = cipher.decrypt(encrypted_message).decode('utf-8', errors='ignore')
             elif encryption_method == '3DES':
                 iv_des = message[:8]
                 encrypted_message = message[8:]
                 cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
-                decrypted_message = cipher.decrypt(encrypted_message)
-                print(decrypted_message.decode('utf-8', errors='ignore'))
+                decrypted_message = cipher.decrypt(encrypted_message).decode('utf-8', errors='ignore')
+            if display_log:
+                print(f"Received message: {decrypted_message}")
+            else:
+                print(decrypted_message)
         except Exception as e:
             print(f"Error receiving message: {e}")
 
 def user_interaction():
-    global encryption_method, aes_key, des3_key
+    global encryption_method, aes_key, des3_key, display_log
     port = None  # Initialize port variable
     listener_thread = None  # Initialize listener thread variable
     while True:
-        choose_option = input("Please select an option: help, port, displayip, displayport, connect, mode, send, set mode, exit\n")
+        choose_option = input("Please select an option: help, port, displayip, displayport, connect, mode, send, set mode, log, exit\n")
         if choose_option == 'help':
             print("Options:\n"
-                  "2 - Choose debug mode\n"
-                  "on - Display log\n"
-                  "off - Do not display log\n"
-                  "u - Unencrypt\n"
-                  "a1 - AES encryption\n"
-                  "a2 - 3DES encryption")
+                  "port - Choose the port for the client\n"
+                  "displayip - Show IP\n"
+                  "displayport - Show port\n"
+                  "connect - Connect to the server\n"
+                  "mode - Choose mode for sent message.\n u - Unencrypt\n a1 - AES encryption\n a2 - 3DES encryption\n"
+                  "send - send the message to another client\n"
+                  "set mode - chang mode for sent message.\n u - Unencrypt\n a1 - AES encryption\n a2 - 3DES encryption\n"
+                  "log - on is display log, off is display log\n"
+                  "exit - exit the program\n")
         elif choose_option == 'port':
             port = input("Enter port: ")
             try:
@@ -60,7 +67,6 @@ def user_interaction():
                 if 0 <= port <= 65535:
                     client.bind(('', port))  # Bind the client socket to the specified port
                     print(f"This client is accepting connections on port {port}")
-                    
                 else:
                     print("Port must be in the range 0-65535.")
             except ValueError:
@@ -77,7 +83,8 @@ def user_interaction():
         elif choose_option == 'connect':
             try:
                 client.sendto(b'connect', (ip, server_port))
-                print(f"Sent 'connect' to {ip}:{server_port}")
+                if display_log:
+                    print(f"Sent 'connect' to {ip}:{server_port}")
                 public_pem, addr = client.recvfrom(2048)
                 loaded_public_key = serialization.load_pem_public_key(public_pem)
 
@@ -104,6 +111,11 @@ def user_interaction():
                     )
                 )
                 client.sendto(encrypted_des3_key, (ip, server_port))
+
+                # Start a thread to listen for incoming messages
+                listener_thread = threading.Thread(target=receive_messages)
+                listener_thread.daemon = True
+                listener_thread.start()
 
             except Exception as e:
                 print(f"Failed to send 'connect': {e}")
@@ -132,7 +144,8 @@ def user_interaction():
                 }[chose_encryption_method]
                 try:
                     client.sendto(encryption_method.encode(), (ip, server_port))
-                    print(f"Sent '{encryption_method}' to {ip}:{server_port}")
+                    if display_log:
+                        print(f"Sent '{encryption_method}' to {ip}:{server_port}")
                 except Exception as e:
                     print(f"Failed to send '{encryption_method}': {e}")
             else:
@@ -151,13 +164,21 @@ def user_interaction():
                     cipher = DES3.new(des3_key, DES3.MODE_CFB, iv_des)
                     sent_message = iv_des + cipher.encrypt(message.encode('utf-8'))
                 client.sendto(sent_message, (ip, server_port))
-                print(f"Sent '{message}' to {ip}:{server_port}")
-                # Start a thread to listen for incoming messages
-                listener_thread = threading.Thread(target=receive_messages)
-                listener_thread.daemon = True
-                listener_thread.start()
+                if display_log:
+                    print(f"Sent '{message}' to {ip}:{server_port}")
+                
             except Exception as e:
                 print(f"Failed to send '{message}': {e}")
+        elif choose_option == 'log':
+            log_option = input("Choose log option (on/off): ")
+            if log_option == 'on':
+                display_log = True
+                print("Log display is ON")
+            elif log_option == 'off':
+                display_log = False
+                print("Log display is OFF")
+            else:
+                print("Invalid option. Please try again.")
         elif choose_option == 'exit':
             print("Exiting...")
             break
